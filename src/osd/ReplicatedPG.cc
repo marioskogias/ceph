@@ -6668,6 +6668,7 @@ void ReplicatedPG::eval_repop(RepGather *repop)
       assert(repop_queue.front() == repop);
     }
     repop->ctx->op->trace_pg("All done");
+    repop->ctx->op->trace_pg("Span ended");
     repop_queue.pop_front();
     remove_repop(repop);
   }
@@ -6788,6 +6789,9 @@ void ReplicatedBackend::issue_op(
       false, acks_wanted,
       get_osdmap()->get_epoch(),
       tid, at_version);
+    if (op->op->get_req()) {
+        wr->set_trace(op->op->get_req()->get_trace());
+    }
 
     // ship resulting transaction, log entries, and pg_stats
     if (!parent->should_send_op(peer, soid)) {

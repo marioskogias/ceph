@@ -127,6 +127,7 @@ public:
     : Message(CEPH_MSG_OSD_OPREPLY, HEAD_VERSION, COMPAT_VERSION) { }
   MOSDOpReply(MOSDOp *req, int r, epoch_t e, int acktype, bool ignore_out_data)
     : Message(CEPH_MSG_OSD_OPREPLY, HEAD_VERSION, COMPAT_VERSION) {
+    set_trace(req->get_trace());
     set_tid(req->get_tid());
     ops = req->ops;
     result = r;

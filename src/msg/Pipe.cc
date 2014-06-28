@@ -1530,8 +1530,10 @@ void Pipe::reader()
       } else {
 	in_q->enqueue(m, m->get_priority(), conn_id);
       }
-      if (messenger_trace)
+      if (messenger_trace) {
 	      messenger_trace->event("Messenger end");
+	      messenger_trace->event("Span ended");
+      }
     }
 
     else if (tag == CEPH_MSGR_TAG_CLOSE) {

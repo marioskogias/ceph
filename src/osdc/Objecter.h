@@ -27,6 +27,7 @@
 #include "include/rados/rados_types.h"
 #include "include/rados/rados_types.hpp"
 
+#include <ztracer.hpp>
 #include <list>
 #include <map>
 #include <memory>
@@ -1024,6 +1025,7 @@ private:
   int global_op_flags; // flags which are applied to each IO op
   bool keep_balanced_budget;
   bool honor_osdmap_full;
+	ZTracer::ZTraceEndpointRef objecter_endp;
 
 public:
   void maybe_request_map();
@@ -1560,7 +1562,9 @@ public:
     osd_timeout(osd_timeout),
     op_throttle_bytes(cct, "objecter_bytes", cct->_conf->objecter_inflight_op_bytes),
     op_throttle_ops(cct, "objecter_ops", cct->_conf->objecter_inflight_ops)
-  { }
+  {
+	 objecter_endp = ZTracer::create_ZTraceEndpoint("0.0.0.0", 0, "Objecter");	
+	}
   ~Objecter() {
     assert(!tick_event);
     assert(!m_request_state_hook);
@@ -1706,7 +1710,8 @@ public:
 	     snapid_t snapid, bufferlist *pbl, int flags,
 	     Context *onack, version_t *objver = NULL) {
     Op *o = prepare_read_op(oid, oloc, op, snapid, pbl, flags, onack, objver);
-    return op_submit(o);
+    o->set_trace(op.trace);
+		return op_submit(o);
   }
   ceph_tid_t pg_read(uint32_t hash, object_locator_t oloc,
 		ObjectOperation& op,
@@ -1797,6 +1802,25 @@ public:
     o->snapid = snap;
     o->outbl = pbl;
     return op_submit(o);
+  }
+  
+	ceph_tid_t read_traced(const object_t& oid, const object_locator_t& oloc,
+	     uint64_t off, uint64_t len, snapid_t snap, bufferlist *pbl, int flags,
+	     Context *onfinish, struct blkin_trace_info *info,
+	     version_t *objver = NULL, ObjectOperation *extra_ops = NULL) {
+    vector<OSDOp> ops;
+    int i = init_ops(ops, 1, extra_ops);
+    ops[i].op.op = CEPH_OSD_OP_READ;
+    ops[i].op.extent.offset = off;
+    ops[i].op.extent.length = len;
+    ops[i].op.extent.truncate_size = 0;
+    ops[i].op.extent.truncate_seq = 0;
+    Op *o = new Op(oid, oloc, ops, flags | global_op_flags | CEPH_OSD_FLAG_READ, onfinish, 0, objver);
+    o->snapid = snap;
+    o->outbl = pbl;
+    ZTracer::ZTraceRef t = ZTracer::create_ZTrace("librados", objecter_endp, info);
+		o->set_trace(t);
+		return op_submit(o);
   }
 
   ceph_tid_t read_trunc(const object_t& oid, const object_locator_t& oloc,
@@ -1898,6 +1922,26 @@ public:
     Op *o = new Op(oid, oloc, ops, flags | global_op_flags | CEPH_OSD_FLAG_WRITE, onack, oncommit, objver);
     o->mtime = mtime;
     o->snapc = snapc;
+    return op_submit(o);
+  }
+  ceph_tid_t write_traced(const object_t& oid, const object_locator_t& oloc,
+	      uint64_t off, uint64_t len, const SnapContext& snapc, const bufferlist &bl,
+	      utime_t mtime, int flags,
+	      Context *onack, Context *oncommit, struct blkin_trace_info *info,
+	      version_t *objver = NULL, ObjectOperation *extra_ops = NULL) {
+    vector<OSDOp> ops;
+    int i = init_ops(ops, 1, extra_ops);
+    ops[i].op.op = CEPH_OSD_OP_WRITE;
+    ops[i].op.extent.offset = off;
+    ops[i].op.extent.length = len;
+    ops[i].op.extent.truncate_size = 0;
+    ops[i].op.extent.truncate_seq = 0;
+    ops[i].indata = bl;
+    Op *o = new Op(oid, oloc, ops, flags | global_op_flags | CEPH_OSD_FLAG_WRITE, onack, oncommit, objver);
+    o->mtime = mtime;
+    o->snapc = snapc;
+    ZTracer::ZTraceRef t = ZTracer::create_ZTrace("librados", objecter_endp, info);
+		o->set_trace(t);
     return op_submit(o);
   }
   ceph_tid_t append(const object_t& oid, const object_locator_t& oloc,

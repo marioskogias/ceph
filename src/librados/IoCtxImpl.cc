@@ -661,6 +661,30 @@ int librados::IoCtxImpl::aio_read(const object_t oid, AioCompletionImpl *c,
   return 0;
 }
 
+int librados::IoCtxImpl::aio_read_traced(const object_t oid, AioCompletionImpl *c,
+ 					 char *buf, size_t len, uint64_t off,
+					 uint64_t snapid, 
+					 struct blkin_trace_info *info)
+{
+  if (len > (size_t) INT_MAX)
+    return -EDOM;
+
+  Context *onack = new C_aio_Ack(c);
+
+  c->is_read = true;
+  c->io = this;
+  c->bl.clear();
+  c->bl.push_back(buffer::create_static(len, buf));
+  c->blp = &c->bl;
+
+  Mutex::Locker l(*lock);
+  objecter->read_traced(oid, oloc,
+		 off, len, snapid, &c->bl, 0,
+		 onack, info, &c->objver);
+
+  return 0;
+}
+
 class C_ObjectOperation : public Context {
 public:
   ::ObjectOperation m_ops;
@@ -721,6 +745,32 @@ int librados::IoCtxImpl::aio_write(const object_t &oid, AioCompletionImpl *c,
   return 0;
 }
 
+int librados::IoCtxImpl::aio_write_traced(const object_t &oid, 
+					  AioCompletionImpl *c,
+				   	  const bufferlist& bl, size_t len,
+					  uint64_t off,
+					  struct blkin_trace_info *info)
+{
+  utime_t ut = ceph_clock_now(client->cct);
+  ldout(client->cct, 20) << "aio_write_traced " << oid << " " << off << "~" << len << " snapc=" << snapc << " snap_seq=" << snap_seq << dendl;
+
+  /* can't write to a snapshot */
+  if (snap_seq != CEPH_NOSNAP)
+    return -EROFS;
+
+  c->io = this;
+  queue_aio_write(c);
+
+  Context *onack = new C_aio_Ack(c);
+  Context *onsafe = new C_aio_Safe(c);
+
+  Mutex::Locker l(*lock);
+  objecter->write_traced(oid, oloc,
+		  off, len, snapc, bl, ut, 0,
+		  onack, onsafe, info, &c->objver);
+
+  return 0;
+}
 int librados::IoCtxImpl::aio_append(const object_t &oid, AioCompletionImpl *c,
 				    const bufferlist& bl, size_t len)
 {
