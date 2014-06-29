@@ -25,6 +25,7 @@
 #include "include/xlist.h"
 #include "osd/osd_types.h"
 #include "osdc/Objecter.h"
+#include <ztracer.hpp>
 
 class RadosClient;
 
@@ -49,6 +50,7 @@ struct librados::IoCtxImpl {
 
   Mutex *lock;
   Objecter *objecter;
+  ZTracer::ZTraceEndpointRef ioctx_endp;
 
   IoCtxImpl();
   IoCtxImpl(RadosClient *c, Objecter *objecter, Mutex *client_lock,

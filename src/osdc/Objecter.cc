@@ -1845,7 +1845,8 @@ void Objecter::handle_osd_op_reply(MOSDOpReply *m)
   }
   
   ldout(cct, 5) << num_unacked << " unacked, " << num_uncommitted << " uncommitted" << dendl;
-
+  if (op->trace)
+    op->trace->event("Before callbacks");
   // do callbacks
   if (onack) {
     onack->complete(rc);
@@ -1853,6 +1854,8 @@ void Objecter::handle_osd_op_reply(MOSDOpReply *m)
   if (oncommit) {
     oncommit->complete(rc);
   }
+  if (op->trace)
+      op->trace->event("Objecter end");
 
   m->put();
 }

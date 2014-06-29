@@ -15,7 +15,6 @@
 #include <limits.h>
 
 #include "IoCtxImpl.h"
-#include <ztracer.hpp>
 #include "librados/AioCompletionImpl.h"
 #include "librados/PoolAsyncCompletionImpl.h"
 #include "librados/RadosClient.h"
@@ -30,6 +29,7 @@ librados::IoCtxImpl::IoCtxImpl() :
   notify_timeout(30), aio_write_list_lock("librados::IoCtxImpl::aio_write_list_lock"),
   aio_write_seq(0), lock(NULL), objecter(NULL)
 {
+    ioctx_endp = ZTracer::create_ZTraceEndpoint("0.0.0.0", 0, "Ioctx");	
 }
 
 librados::IoCtxImpl::IoCtxImpl(RadosClient *c, Objecter *objecter,
@@ -41,6 +41,7 @@ librados::IoCtxImpl::IoCtxImpl(RadosClient *c, Objecter *objecter,
     aio_write_list_lock("librados::IoCtxImpl::aio_write_list_lock"),
     aio_write_seq(0), lock(client_lock), objecter(objecter)
 {
+    ioctx_endp = ZTracer::create_ZTraceEndpoint("0.0.0.0", 0, "Ioctx");	
 }
 
 void librados::IoCtxImpl::set_snap_read(snapid_t s)
@@ -669,6 +670,10 @@ int librados::IoCtxImpl::aio_read_traced(const object_t oid, AioCompletionImpl *
   if (len > (size_t) INT_MAX)
     return -EDOM;
 
+  /*handle trace*/
+  ZTracer::ZTraceRef trace;
+  trace = ZTracer::create_ZTrace("librados", ioctx_endp, info);
+  trace->event("librados accept");
   Context *onack = new C_aio_Ack(c);
 
   c->is_read = true;
@@ -676,11 +681,15 @@ int librados::IoCtxImpl::aio_read_traced(const object_t oid, AioCompletionImpl *
   c->bl.clear();
   c->bl.push_back(buffer::create_static(len, buf));
   c->blp = &c->bl;
-
+  
   Mutex::Locker l(*lock);
+  trace->event("send to objecter");
+  struct blkin_trace_info *child_info = (struct blkin_trace_info *)
+      malloc(sizeof(struct blkin_trace_info));
+  trace->get_trace_info(child_info);
   objecter->read_traced(oid, oloc,
 		 off, len, snapid, &c->bl, 0,
-		 onack, info, &c->objver);
+		 onack, child_info, &c->objver);
 
   return 0;
 }
@@ -757,6 +766,11 @@ int librados::IoCtxImpl::aio_write_traced(const object_t &oid,
   /* can't write to a snapshot */
   if (snap_seq != CEPH_NOSNAP)
     return -EROFS;
+  
+  /*handle trace*/
+  ZTracer::ZTraceRef trace;
+  trace = ZTracer::create_ZTrace("librados", ioctx_endp, info);
+  trace->event("librados accept");
 
   c->io = this;
   queue_aio_write(c);
@@ -765,9 +779,13 @@ int librados::IoCtxImpl::aio_write_traced(const object_t &oid,
   Context *onsafe = new C_aio_Safe(c);
 
   Mutex::Locker l(*lock);
+  trace->event("send to objecter");
+  struct blkin_trace_info *child_info = (struct blkin_trace_info *)
+      malloc(sizeof(struct blkin_trace_info));
+  trace->get_trace_info(child_info);
   objecter->write_traced(oid, oloc,
 		  off, len, snapc, bl, ut, 0,
-		  onack, onsafe, info, &c->objver);
+		  onack, onsafe, child_info, &c->objver);
 
   return 0;
 }

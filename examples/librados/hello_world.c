@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <rados/librados.h>
 #include <stdlib.h>
-#include <zipkin_c.h>
+#include <blkin-front.h>
 
 #define POOL "marios"
 
@@ -53,8 +53,13 @@ int main()
     char temp[12];
     rados_completion_t compl;
     rados_ioctx_t *rados_ctx;
-    
-     /*initialize endpoint*/
+    /*initialize lib*/
+    r = blkin_init();
+    if (r < 0) {
+        fprintf(stderr, "Could not initialize blkin\n");
+        exit(1);
+    }    
+    /*initialize endpoint*/
     struct blkin_endpoint endp;
     blkin_init_endpoint(&endp, "10.0.0.1", 5000, "rados client");
     struct blkin_trace trace;
@@ -76,7 +81,8 @@ int main()
         exit(1);
     }
     printf("created completion\n");
-    r = rados_aio_write(*rados_ctx, object_name, compl, object_val, 12, 0);
+    r = rados_aio_write_traced(*rados_ctx, object_name, compl, object_val, 12,
+            0, &trace.info);
 
     rados_aio_wait_for_complete(compl);
     printf("completed\n");
@@ -88,7 +94,8 @@ int main()
         exit(1);
     }
     printf("created completion\n");
-    r = rados_aio_read(*rados_ctx, object_name, compl, temp, 12, 0);
+    r = rados_aio_read_traced(*rados_ctx, object_name, compl, temp, 12, 0, 
+            &trace.info);
     rados_aio_wait_for_complete(compl);
     printf("I read:\n");
     for (i=0;i<12;i++)

@@ -1818,8 +1818,11 @@ public:
     Op *o = new Op(oid, oloc, ops, flags | global_op_flags | CEPH_OSD_FLAG_READ, onfinish, 0, objver);
     o->snapid = snap;
     o->outbl = pbl;
-    ZTracer::ZTraceRef t = ZTracer::create_ZTrace("librados", objecter_endp, info);
-		o->set_trace(t);
+    ZTracer::ZTraceRef t = ZTracer::create_ZTrace("librados", objecter_endp);
+    t->set_trace_info(info);
+    t->event("Objecter read");
+	o->set_trace(t);
+    free(info);
 		return op_submit(o);
   }
 
@@ -1940,8 +1943,11 @@ public:
     Op *o = new Op(oid, oloc, ops, flags | global_op_flags | CEPH_OSD_FLAG_WRITE, onack, oncommit, objver);
     o->mtime = mtime;
     o->snapc = snapc;
-    ZTracer::ZTraceRef t = ZTracer::create_ZTrace("librados", objecter_endp, info);
-		o->set_trace(t);
+    ZTracer::ZTraceRef t = ZTracer::create_ZTrace("librados", objecter_endp);
+    t->set_trace_info(info);
+    t->event("Objecter write");
+	o->set_trace(t);
+    free(info);
     return op_submit(o);
   }
   ceph_tid_t append(const object_t& oid, const object_locator_t& oloc,
