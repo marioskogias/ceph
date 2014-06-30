@@ -7567,6 +7567,7 @@ void OSD::handle_replica_op(OpRequestRef op)
   if (!pg) {
     return;
   }
+  op->create_pg_trace(pg->get_trace_endpoint());
   enqueue_op(pg, op);
   op->trace_osd("Enqueued replica op");
   op->trace_osd("Span ended");

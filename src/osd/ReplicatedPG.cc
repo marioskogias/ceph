@@ -6790,7 +6790,9 @@ void ReplicatedBackend::issue_op(
       get_osdmap()->get_epoch(),
       tid, at_version);
     if (op->op->get_req()) {
-        wr->set_trace(op->op->get_req()->get_trace());
+        struct blkin_trace_info tinfo;
+        op->op->get_pg_trace_info(&tinfo);
+        wr->set_trace_info(&tinfo);
     }
 
     // ship resulting transaction, log entries, and pg_stats
