@@ -101,5 +101,5 @@ int main()
     for (i=0;i<12;i++)
         printf("%c",temp[i]);
     printf("completed\n");
-    BLKIN_TIMESTAMP(&trace, &endp, "end");
+    BLKIN_TIMESTAMP(&trace, &endp, "Span ended");
 }

@@ -672,7 +672,7 @@ int librados::IoCtxImpl::aio_read_traced(const object_t oid, AioCompletionImpl *
 
   /*handle trace*/
   ZTracer::ZTraceRef trace;
-  trace = ZTracer::create_ZTrace("librados", ioctx_endp, info);
+  trace = ZTracer::create_ZTrace("librados", ioctx_endp, info, true);
   trace->event("librados accept");
   Context *onack = new C_aio_Ack(c);
 
@@ -769,7 +769,7 @@ int librados::IoCtxImpl::aio_write_traced(const object_t &oid,
   
   /*handle trace*/
   ZTracer::ZTraceRef trace;
-  trace = ZTracer::create_ZTrace("librados", ioctx_endp, info);
+  trace = ZTracer::create_ZTrace("librados", ioctx_endp, info, true);
   trace->event("librados accept");
 
   c->io = this;

@@ -6607,8 +6607,7 @@ void ReplicatedPG::eval_repop(RepGather *repop)
 	reply->add_flags(CEPH_OSD_FLAG_ACK | CEPH_OSD_FLAG_ONDISK);
 	dout(10) << " sending commit on " << *repop << " " << reply << dendl;
 	osd->send_message_osd_client(reply, m->get_connection());
-        m->trace("Replied");
-        m->trace("Span ended");
+    m->trace("Replied commit");
 	repop->sent_disk = true;
 	repop->ctx->op->mark_commit_sent();
       }
@@ -6649,6 +6648,7 @@ void ReplicatedPG::eval_repop(RepGather *repop)
         assert(entity_name_t::TYPE_OSD != m->get_connection()->peer_type);
 	osd->send_message_osd_client(reply, m->get_connection());
 	repop->sent_ack = true;
+    m->trace("Replied ack");
       }
 
       // note the write is now readable (for rlatency calc).  note
@@ -6682,6 +6682,7 @@ void ReplicatedPG::eval_repop(RepGather *repop)
       assert(repop_queue.front() == repop);
     }
     repop->ctx->op->trace_pg("All done");
+    m->trace("Span ended");
     repop_queue.pop_front();
     remove_repop(repop);
   }

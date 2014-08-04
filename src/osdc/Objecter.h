@@ -1169,10 +1169,11 @@ public:
 	target.base_oloc.key.clear();
     }
     ~Op() {
-      while (!out_handler.empty()) {
-	delete out_handler.back();
-	out_handler.pop_back();
-      }
+        while (!out_handler.empty()) {
+            delete out_handler.back();
+            out_handler.pop_back();
+        }
+        trace->event("Span ended");
     }
 
     void set_trace(TrackedOpTrace t) { trace = t; }

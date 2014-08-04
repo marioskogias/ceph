@@ -1727,18 +1727,25 @@ void Objecter::handle_osd_op_reply(MOSDOpReply *m)
     ldout(cct, 7) << "handle_osd_op_reply " << tid
 	    << (m->is_ondisk() ? " ondisk":(m->is_onnvram() ? " onnvram":" ack"))
 	    << " ... stray" << dendl;
+    m->trace("Span ended");
     m->put();
     return;
   }
 
   ldout(cct, 7) << "handle_osd_op_reply " << tid
-		<< (m->is_ondisk() ? " ondisk":(m->is_onnvram() ? " onnvram":" ack"))
-		<< " v " << m->get_replay_version() << " uv " << m->get_user_version()
-		<< " in " << m->get_pg()
-		<< " attempt " << m->get_retry_attempt()
-		<< dendl;
+      << (m->is_ondisk() ? " ondisk":(m->is_onnvram() ? " onnvram":" ack"))
+      << " v " << m->get_replay_version() << " uv " << m->get_user_version()
+      << " in " << m->get_pg()
+      << " attempt " << m->get_retry_attempt()
+      << dendl;
   Op *op = ops[tid];
-
+  if (op->oncommit) {
+      m->trace("oncommit message");
+  }
+  if (op->onack) {
+      m->trace("onack message");
+  }
+  m->trace("Span ended");
   if (m->get_retry_attempt() >= 0) {
     if (m->get_retry_attempt() != (op->attempts - 1)) {
       ldout(cct, 7) << " ignoring reply from attempt " << m->get_retry_attempt()
@@ -1797,6 +1804,9 @@ void Objecter::handle_osd_op_reply(MOSDOpReply *m)
   assert(op->out_bl.size() == op->out_rval.size());
   assert(op->out_bl.size() == op->out_handler.size());
   vector<OSDOp>::iterator p = out_ops.begin();
+  if (op->trace) {
+      op->trace->event("in handle_osd_op_reply");
+  } 
   for (unsigned i = 0;
        p != out_ops.end() && pb != op->out_bl.end();
        ++i, ++p, ++pb, ++pr, ++ph) {
@@ -1847,8 +1857,6 @@ void Objecter::handle_osd_op_reply(MOSDOpReply *m)
   }
   
   ldout(cct, 5) << num_unacked << " unacked, " << num_uncommitted << " uncommitted" << dendl;
-  if (op->trace)
-    op->trace->event("Before callbacks");
   // do callbacks
   if (onack) {
     onack->complete(rc);
@@ -1856,8 +1864,6 @@ void Objecter::handle_osd_op_reply(MOSDOpReply *m)
   if (oncommit) {
     oncommit->complete(rc);
   }
-  if (op->trace)
-      op->trace->event("Objecter end");
 
   m->put();
 }
