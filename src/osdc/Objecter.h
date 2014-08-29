@@ -1173,7 +1173,8 @@ public:
             delete out_handler.back();
             out_handler.pop_back();
         }
-        trace->event("Span ended");
+	if (trace)
+        	trace->event("Span ended");
     }
 
     void set_trace(TrackedOpTrace t) { trace = t; }
